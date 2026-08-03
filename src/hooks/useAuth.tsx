@@ -15,41 +15,47 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+function ClerkAuthProviderImpl({ children }: { children: ReactNode }) {
+  const { user: clerkUser, isLoaded } = useUser();
+  const { signOut: clerkSignOut } = useClerk();
+
+  const activeUser: User | null = clerkUser
+    ? {
+        id: clerkUser.id,
+        name: clerkUser.fullName || clerkUser.primaryEmailAddress?.emailAddress?.split('@')[0] || 'User',
+        email: clerkUser.primaryEmailAddress?.emailAddress || '',
+        avatar: clerkUser.imageUrl,
+        avatarUrl: clerkUser.imageUrl,
+        plan: 'free',
+      }
+    : null;
+
+  const signIn = useCallback(async () => {}, []);
+  const signUp = useCallback(async () => {}, []);
+  const signOut = useCallback(() => {
+    clerkSignOut();
+    clearUser();
+  }, [clerkSignOut]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user: activeUser,
+        signIn,
+        signUp,
+        signOut,
+        isLoading: !isLoaded,
+        isClerkEnabled: true,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+function LocalAuthProviderImpl({ children }: { children: ReactNode }) {
   const [localUser, setLocalUserState] = useState<User | null>(() => getUser());
   const [isLoading, setIsLoading] = useState(false);
-
-  // If Clerk is enabled, use Clerk's real state
-  let clerkUser: ReturnType<typeof useUser>['user'] = null;
-  let clerkIsLoaded = true;
-  let clerkSignOut: (() => Promise<void>) | null = null;
-
-  if (isClerkEnabled) {
-    try {
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const { user: cUser, isLoaded } = useUser();
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const { signOut: cSignOut } = useClerk();
-      clerkUser = cUser;
-      clerkIsLoaded = isLoaded;
-      clerkSignOut = cSignOut;
-    } catch {
-      // Fallback if rendered outside ClerkProvider
-    }
-  }
-
-  const activeUser: User | null = isClerkEnabled
-    ? clerkUser
-      ? {
-          id: clerkUser.id,
-          name: clerkUser.fullName || clerkUser.primaryEmailAddress?.emailAddress?.split('@')[0] || 'User',
-          email: clerkUser.primaryEmailAddress?.emailAddress || '',
-          avatar: clerkUser.imageUrl,
-          avatarUrl: clerkUser.imageUrl,
-          plan: 'free',
-        }
-      : null
-    : localUser;
 
   const signIn = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
@@ -82,27 +88,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(() => {
-    if (isClerkEnabled && clerkSignOut) {
-      clerkSignOut();
-    }
     clearUser();
     setLocalUserState(null);
-  }, [clerkSignOut]);
+  }, []);
 
   return (
     <AuthContext.Provider
       value={{
-        user: activeUser,
+        user: localUser,
         signIn,
         signUp,
         signOut,
-        isLoading: isClerkEnabled ? !clerkIsLoaded : isLoading,
-        isClerkEnabled,
+        isLoading,
+        isClerkEnabled: false,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  if (isClerkEnabled) {
+    return <ClerkAuthProviderImpl>{children}</ClerkAuthProviderImpl>;
+  }
+  return <LocalAuthProviderImpl>{children}</LocalAuthProviderImpl>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
