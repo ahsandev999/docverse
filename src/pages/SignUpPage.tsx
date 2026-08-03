@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FileText, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import { SignUp } from '@clerk/clerk-react';
 import { useAuth } from '../hooks/useAuth';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
@@ -10,9 +11,17 @@ export default function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { signUp, isLoading } = useAuth();
+  const { signUp, isLoading, isClerkEnabled } = useAuth();
   const navigate = useNavigate();
   useDocumentTitle('Create Account');
+
+  if (isClerkEnabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 px-4 py-12">
+        <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" forceRedirectUrl="/dashboard" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

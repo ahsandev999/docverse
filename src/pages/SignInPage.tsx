@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FileText, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { SignIn } from '@clerk/clerk-react';
 import { useAuth } from '../hooks/useAuth';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
@@ -9,9 +10,17 @@ export default function SignInPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { signIn, isLoading } = useAuth();
+  const { signIn, isLoading, isClerkEnabled } = useAuth();
   const navigate = useNavigate();
   useDocumentTitle('Sign In');
+
+  if (isClerkEnabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 px-4 py-12">
+        <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" forceRedirectUrl="/dashboard" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
