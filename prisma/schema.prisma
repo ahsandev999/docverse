@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  clerkId       String    @unique
+  email         String    @unique
+  name          String?
+  avatarUrl     String?
+  plan          Plan      @default(FREE)
+  files         File[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model File {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalName  String
+  storedKey     String
+  resultKey     String?
+  toolSlug      String
+  status        FileStatus @default(PROCESSING)
+  fileSize      Int
+  resultSize    Int?
+  mimeType      String    @default("application/pdf")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([toolSlug])
+}
+
+enum Plan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum FileStatus {
+  UPLOADING
+  PROCESSING
+  COMPLETED
+  ERROR
+}

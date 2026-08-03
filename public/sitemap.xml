@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://docverse.cloud/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://docverse.cloud/dashboard</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://docverse.cloud/tools/merge-pdf</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://docverse.cloud/tools/split-pdf</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://docverse.cloud/tools/compress-pdf</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://docverse.cloud/tools/rotate-pdf</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://docverse.cloud/tools/jpg-to-pdf</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://docverse.cloud/tools/png-to-pdf</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://docverse.cloud/tools/delete-pages</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://docverse.cloud/tools/extract-pages</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://docverse.cloud/tools/pdf-to-word</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://docverse.cloud/tools/word-to-pdf</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://docverse.cloud/tools/pdf-to-jpg</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://docverse.cloud/tools/excel-to-pdf</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://docverse.cloud/tools/powerpoint-to-pdf</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://docverse.cloud/tools/pdf-to-png</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://docverse.cloud/tools/organize-pages</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+</urlset>
