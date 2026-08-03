@@ -1,6 +1,6 @@
 import type { VercelRequest } from '@vercel/node';
-import { requireAuth, type VercelResponse } from '../../_lib/auth';
-import { prisma } from '../../_lib/db';
+import { requireAuth, type VercelResponse } from '../_lib/auth';
+import { prisma } from '../_lib/db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'DELETE') {
@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { fileId } = req.body;
     if (!fileId) return res.status(400).json({ error: 'fileId is required' });
 
-    const user = await prisma.user.findUnique({ where: { clerkId: auth.userId } });
+    const user = await prisma.user.findUnique({ where: { clerkId: auth.userId! } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const file = await prisma.file.findFirst({

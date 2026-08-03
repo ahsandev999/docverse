@@ -1,7 +1,7 @@
 import type { VercelRequest } from '@vercel/node';
-import { requireAuth, type VercelResponse } from '../../_lib/auth';
-import { prisma } from '../../_lib/db';
-import { fileHistoryQuerySchema } from '../../_lib/schemas';
+import { requireAuth, type VercelResponse } from '../_lib/auth';
+import { prisma } from '../_lib/db';
+import { fileHistoryQuerySchema } from '../_lib/schemas';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -13,7 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const query = fileHistoryQuerySchema.parse(req.query);
-    const user = await prisma.user.findUnique({ where: { clerkId: auth.userId } });
+    const user = await prisma.user.findUnique({ where: { clerkId: auth.userId! } });
     if (!user) return res.status(200).json({ files: [], total: 0 });
 
     const where = {
