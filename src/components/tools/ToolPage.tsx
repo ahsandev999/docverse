@@ -314,8 +314,20 @@ export default function ToolPage() {
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mb-2 font-heading">{tool.name}</h1>
-              <p className="text-slate-600 dark:text-slate-400 max-w-xl">{tool.longDescription}</p>
-              <div className="flex items-center gap-3 mt-3">
+              <p className="text-slate-600 dark:text-slate-400 max-w-xl text-sm sm:text-base leading-relaxed">{tool.subtitle || tool.longDescription}</p>
+              
+              {tool.trustBadges && tool.trustBadges.length > 0 && (
+                <div className="flex flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 no-scrollbar mt-4">
+                  {tool.trustBadges.map(badge => (
+                    <span key={badge.text} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 flex-shrink-0">
+                      <span>{badge.icon}</span>
+                      <span>{badge.text}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 mt-4">
                 <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">{tool.inputFormat} → {tool.outputFormat}</span>
                 {tool.popular && <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400">Popular</span>}
               </div>
@@ -462,7 +474,7 @@ export default function ToolPage() {
           </div>
         </div>
 
-        {/* Related Tools - Placed BEFORE FAQ section */}
+        {/* Related Tools - Placed DIRECTLY under How to use section */}
         {relatedTools.length > 0 && (
           <div className="mt-8">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 font-heading">Related Tools</h2>
@@ -490,6 +502,33 @@ export default function ToolPage() {
             </div>
           </div>
         )}
+
+        {tool.keyFeatures && tool.keyFeatures.length > 0 && (
+          <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6 font-heading">Key Features of {tool.name}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {tool.keyFeatures.map((feat) => (
+                <div key={feat} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                  <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{feat}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tool.seoContent && (
+          <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 font-heading">Why Convert with {tool.name}?</h2>
+            <div className="space-y-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              {tool.seoContent.split('\n\n').map((paragraph, idx) => (
+                <p key={idx}>{paragraph}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
+
 
         {/* Interactive Slide-Down FAQ Accordion with Tool-Specific High-Volume Search FAQs */}
         {(() => {
@@ -540,35 +579,54 @@ export default function ToolPage() {
           );
         })()}
 
-        {/* JSON-LD Structured Data: Breadcrumbs & FAQ */}
+        {/* JSON-LD Structured Data: SoftwareApplication, HowTo, BreadcrumbList, & FAQPage */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
-              '@type': 'BreadcrumbList',
-              itemListElement: [
-                { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://docverse.cloud/' },
-                { '@type': 'ListItem', position: 2, name: 'Tools', item: 'https://docverse.cloud/#tools' },
-                { '@type': 'ListItem', position: 3, name: tool.name, item: `https://docverse.cloud/tools/${tool.slug}` },
-              ],
-            }),
-          }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'FAQPage',
-              mainEntity: getFaqsForTool(tool.slug).map((faq) => ({
-                '@type': 'Question',
-                name: faq.question,
-                acceptedAnswer: {
-                  '@type': 'Answer',
-                  text: faq.answer,
+              '@graph': [
+                {
+                  '@type': 'SoftwareApplication',
+                  name: `DocVerse ${tool.name}`,
+                  applicationCategory: 'BusinessApplication',
+                  operatingSystem: 'Any (Web-based)',
+                  offers: {
+                    '@type': 'Offer',
+                    price: '0',
+                    priceCurrency: 'USD',
+                  },
+                  description: tool.seoDescription || tool.description,
                 },
-              })),
+                {
+                  '@type': 'HowTo',
+                  name: `How to use ${tool.name} online`,
+                  step: tool.steps.map((step, idx) => ({
+                    '@type': 'HowToStep',
+                    name: `Step ${idx + 1}`,
+                    text: step,
+                  })),
+                },
+                {
+                  '@type': 'BreadcrumbList',
+                  itemListElement: [
+                    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://docverse.cloud/' },
+                    { '@type': 'ListItem', position: 2, name: 'Tools', item: 'https://docverse.cloud/#tools' },
+                    { '@type': 'ListItem', position: 3, name: tool.name, item: `https://docverse.cloud/tools/${tool.slug}` },
+                  ],
+                },
+                {
+                  '@type': 'FAQPage',
+                  mainEntity: getFaqsForTool(tool.slug).map((faq) => ({
+                    '@type': 'Question',
+                    name: faq.question,
+                    acceptedAnswer: {
+                      '@type': 'Answer',
+                      text: faq.answer,
+                    },
+                  })),
+                },
+              ],
             }),
           }}
         />

@@ -18,6 +18,12 @@ export interface Tool {
   steps: string[];
   clientSide: boolean;
   comingSoon: boolean;
+  seoTitle?: string;
+  seoDescription?: string;
+  subtitle?: string;
+  trustBadges?: { icon: string; text: string }[];
+  seoContent?: string;
+  keyFeatures?: string[];
 }
 
 export interface FileItem {
