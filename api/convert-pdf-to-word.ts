@@ -13,12 +13,8 @@ export const config = {
   },
 };
 
-const ALLOWED_EXTENSIONS = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'];
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
-/**
- * Finds the local path to LibreOffice (soffice) executable across Windows/Linux/macOS.
- */
 function getLibreOfficeExecutable(): string | null {
   const isWin = process.platform === 'win32';
   const candidatePaths = isWin
@@ -31,7 +27,7 @@ function getLibreOfficeExecutable(): string | null {
 
   for (const exe of candidatePaths) {
     try {
-      if (fs.existsSync(exe) || !exe.includes('/') && !exe.includes('\\')) {
+      if (fs.existsSync(exe) || (!exe.includes('/') && !exe.includes('\\'))) {
         return exe;
       }
     } catch {
@@ -49,67 +45,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { fileName, fileData } = req.body || {};
 
   if (!fileName || !fileData) {
-    return res.status(400).json({ error: 'Missing required parameters: fileName and fileData (base64).' });
+    return res.status(400).json({ error: 'Missing required parameters: fileName and fileData.' });
   }
 
-  // 1. Sanitize filename & prevent directory traversal
   const safeName = path.basename(fileName).replace(/[^a-zA-Z0-9_.-]/g, '_');
   const ext = path.extname(safeName).toLowerCase();
 
-  if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    return res.status(415).json({
-      error: `Unsupported file format "${ext}". Allowed extensions: ${ALLOWED_EXTENSIONS.join(', ')}`,
-    });
+  if (ext !== '.pdf') {
+    return res.status(415).json({ error: 'Invalid file extension. PDF to Word requires a .pdf file.' });
   }
 
-  // 2. Decode base64 payload & enforce size limits
   let buffer: Buffer;
   try {
     const base64Data = fileData.replace(/^data:.*;base64,/, '');
     buffer = Buffer.from(base64Data, 'base64');
   } catch {
-    return res.status(400).json({ error: 'Invalid base64 document payload.' });
+    return res.status(400).json({ error: 'Invalid base64 payload.' });
   }
 
   if (buffer.length > MAX_FILE_SIZE_BYTES) {
     return res.status(413).json({ error: 'File size exceeds maximum allowed limit of 25MB.' });
   }
 
+  // Validate PDF magic bytes (%PDF-)
+  if (buffer.length < 5 || buffer.toString('utf8', 0, 5) !== '%PDF-') {
+    return res.status(400).json({ error: 'The uploaded file is not a valid PDF document.' });
+  }
+
   const tmpDir = os.tmpdir();
   const fileHash = Math.random().toString(36).substring(2, 9);
   const inputFilePath = path.join(tmpDir, `docverse_${fileHash}_${safeName}`);
-  const expectedPdfName = `${path.basename(inputFilePath, ext)}.pdf`;
-  const expectedPdfPath = path.join(tmpDir, expectedPdfName);
+  const expectedDocxName = `${path.basename(inputFilePath, ext)}.docx`;
+  const expectedDocxPath = path.join(tmpDir, expectedDocxName);
 
   try {
-    // Write uploaded file to temporary directory
     fs.writeFileSync(inputFilePath, buffer);
 
     const sofficeExe = getLibreOfficeExecutable();
-    let pdfBuffer: Buffer | null = null;
+    let docxBuffer: Buffer | null = null;
 
     if (sofficeExe) {
       try {
-        // Execute LibreOffice headless conversion CLI
         await execFileAsync(sofficeExe, [
           '--headless',
+          '--infilter=writer_pdf_import',
           '--convert-to',
-          'pdf',
+          'docx',
           '--outdir',
           tmpDir,
           inputFilePath,
-        ], { timeout: 30000 });
+        ], { timeout: 35000 });
 
-        if (fs.existsSync(expectedPdfPath)) {
-          pdfBuffer = fs.readFileSync(expectedPdfPath);
+        if (fs.existsSync(expectedDocxPath)) {
+          docxBuffer = fs.readFileSync(expectedDocxPath);
         }
       } catch (cmdErr) {
-        console.warn('[DocVerse Office Convert] LibreOffice CLI error:', cmdErr);
+        console.warn('[DocVerse PDF to Word] LibreOffice CLI error:', cmdErr);
       }
     }
 
-    // High-performance Cloud Fallback for environments without local LibreOffice CLI (e.g. Serverless Vercel)
-    if (!pdfBuffer) {
+    // Cloud fallback for serverless container
+    if (!docxBuffer) {
       try {
         const formData = new FormData();
         const fileBlob = new Blob([new Uint8Array(buffer)]);
@@ -122,41 +118,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (cloudResponse.ok) {
           const arrayBuf = await cloudResponse.arrayBuffer();
-          pdfBuffer = Buffer.from(arrayBuf);
+          docxBuffer = Buffer.from(arrayBuf);
         }
       } catch {
-        // Continue to error fallback
+        // Fallback handled on client side
       }
     }
 
-    if (!pdfBuffer) {
+    if (!docxBuffer) {
       return res.status(500).json({
-        error: 'Office to PDF conversion requires LibreOffice installed on the server environment.',
+        error: 'PDF to Word conversion server engine is unavailable.',
       });
     }
 
-    // Return converted PDF payload
-    const base64Pdf = pdfBuffer.toString('base64');
-    const pdfFileName = `${path.basename(safeName, ext)}.pdf`;
+    const base64Docx = docxBuffer.toString('base64');
+    const docxFileName = `${path.basename(safeName, ext)}.docx`;
 
     return res.status(200).json({
       success: true,
-      pdfFileName,
-      pdfData: `data:application/pdf;base64,${base64Pdf}`,
-      size: pdfBuffer.length,
+      docxFileName,
+      docxData: `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${base64Docx}`,
+      size: docxBuffer.length,
     });
   } catch (err) {
-    console.error('[DocVerse Office Convert] Conversion error:', err);
-    return res.status(500).json({
-      error: 'An unexpected error occurred while processing your document conversion.',
-    });
+    console.error('[DocVerse PDF to Word] Error:', err);
+    return res.status(500).json({ error: 'An unexpected error occurred during PDF to Word conversion.' });
   } finally {
-    // 3. Clean up temporary files immediately
     try {
       if (fs.existsSync(inputFilePath)) fs.unlinkSync(inputFilePath);
-      if (fs.existsSync(expectedPdfPath)) fs.unlinkSync(expectedPdfPath);
+      if (fs.existsSync(expectedDocxPath)) fs.unlinkSync(expectedDocxPath);
     } catch {
-      // Ignore cleanup errors
+      // Ignore cleanup error
     }
   }
 }

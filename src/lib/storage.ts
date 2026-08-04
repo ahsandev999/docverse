@@ -88,3 +88,48 @@ export function generateId(): string {
   }
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
 }
+
+export function getFavoriteTools(): string[] {
+  try {
+    const data = localStorage.getItem('docverse-favorites');
+    return data ? JSON.parse(data) : ['merge-pdf', 'compress-pdf', 'pdf-to-word', 'word-to-pdf'];
+  } catch {
+    return ['merge-pdf', 'compress-pdf', 'pdf-to-word', 'word-to-pdf'];
+  }
+}
+
+export function toggleFavoriteTool(slug: string): string[] {
+  try {
+    const favorites = getFavoriteTools();
+    const updated = favorites.includes(slug)
+      ? favorites.filter((s) => s !== slug)
+      : [...favorites, slug];
+    localStorage.setItem('docverse-favorites', JSON.stringify(updated));
+    return updated;
+  } catch {
+    return getFavoriteTools();
+  }
+}
+
+export interface StorageAnalytics {
+  totalFilesProcessed: number;
+  totalStorageBytes: number;
+  formattedStorageSize: string;
+  bandwidthSavedBytes: number;
+  formattedBandwidthSaved: string;
+}
+
+export function getStorageAnalytics(): StorageAnalytics {
+  const files = getRecentFiles();
+  const totalFilesProcessed = files.length;
+  const totalStorageBytes = files.reduce((acc, f) => acc + (f.size || 0), 0);
+  const bandwidthSavedBytes = Math.round(totalStorageBytes * 0.35);
+
+  return {
+    totalFilesProcessed,
+    totalStorageBytes,
+    formattedStorageSize: formatFileSize(totalStorageBytes),
+    bandwidthSavedBytes,
+    formattedBandwidthSaved: formatFileSize(bandwidthSavedBytes),
+  };
+}

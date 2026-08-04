@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, useRef, useId } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Download, Loader2, CheckCircle, AlertCircle, RotateCcw, ArrowRight, Clock } from 'lucide-react';
+import { ChevronRight, ChevronDown, Download, Loader2, CheckCircle, AlertCircle, RotateCcw, ArrowRight, Clock } from 'lucide-react';
 import { getToolBySlug, tools, iconMap } from '../../lib/tools';
+import { getFaqsForTool } from '../../lib/tool-faqs';
 import { mergePDFs, rotatePDF, deletePages, extractPages, imagesToPDF, compressPDF, splitPDF, getPDFPageCount, downloadBlob, PDFProcessingError } from '../../lib/pdf-utils';
 import { addRecentFile, generateId } from '../../lib/storage';
-import { logFileProcessing, convertOfficeToPDF } from '../../lib/api-client';
+import { logFileProcessing, convertOfficeToPDF, convertPdfToWord } from '../../lib/api-client';
 import { convertPdfToImages } from '../../lib/pdf-renderer';
 import OrganizePagesUI from './OrganizePagesUI';
 import DropZone from '../ui/DropZone';
@@ -17,7 +18,7 @@ export default function ToolPage() {
   const { slug } = useParams<{ slug: string }>();
   const tool = getToolBySlug(slug || '');
   const gradientId = useId();
-  useDocumentTitle(tool ? tool.name : 'Tool Not Found');
+  useDocumentTitle(tool ? tool.name : 'Tool Not Found', tool ? tool.description : undefined);
 
   const [files, setFiles] = useState<File[]>([]);
   const [state, setState] = useState<ProcessingState>('idle');
@@ -31,6 +32,7 @@ export default function ToolPage() {
   const [rotationAngle, setRotationAngle] = useState<number>(90);
   const [pageInput, setPageInput] = useState<string>('');
   const [imageQuality, setImageQuality] = useState<'low' | 'medium' | 'high'>('medium');
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Cleanup blob URL on unmount
@@ -113,7 +115,10 @@ export default function ToolPage() {
           break;
         }
         case 'pdf-to-word': {
-          throw new PDFProcessingError('PDF to Word requires server-side processing engine.', 'unknown');
+          const wordResult = await convertPdfToWord(files[0]);
+          result = wordResult.docxBytes;
+          outputName = wordResult.docxFileName;
+          break;
         }
         case 'pdf-to-jpg': case 'pdf-to-png': {
           const isJpeg = tool.slug === 'pdf-to-jpg';
@@ -159,10 +164,13 @@ export default function ToolPage() {
 
       if (result) {
         setResultBytes(result);
-        const blob = new Blob([new Uint8Array(result)], { type: 'application/pdf' });
+        const mimeType = outputName.endsWith('.docx')
+          ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          : 'application/pdf';
+        const blob = new Blob([new Uint8Array(result)], { type: mimeType });
         const url = URL.createObjectURL(blob);
         setResultUrl(url); setResultName(outputName);
-        addRecentFile({ id: generateId(), name: outputName, size: result.length, type: 'application/pdf', toolSlug: tool.slug, createdAt: new Date().toISOString(), status: 'completed' });
+        addRecentFile({ id: generateId(), name: outputName, size: result.length, type: mimeType, toolSlug: tool.slug, createdAt: new Date().toISOString(), status: 'completed' });
         logFileProcessing(tool.slug, outputName, result.length);
       }
       setState('done');
@@ -206,10 +214,30 @@ export default function ToolPage() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setFiles([]); setState('idle'); setProgress(0); setResultUrl(null); setResultName(null);
+    setResultBytes(null); setResultBlob(null);
     setErrorMsg(''); setPageCount(0); setPageInput(''); setRotationAngle(90);
-  };
+  }, []);
+
+  // Keyboard shortcuts: Cmd/Ctrl + Enter to process, Esc to reset
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        if (files.length > 0 && state === 'idle') {
+          e.preventDefault();
+          processFiles();
+        }
+      } else if (e.key === 'Escape') {
+        if (state === 'done' || state === 'error') {
+          e.preventDefault();
+          handleReset();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [files, state, processFiles, handleReset]);
 
   if (!tool) {
     return (
@@ -423,7 +451,7 @@ export default function ToolPage() {
         </div>
 
         <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6 font-heading">How it works</h2>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6 font-heading">How to use {tool.name} online</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {tool.steps.map((step, i) => (
               <div key={step} className="flex items-start gap-3">
@@ -434,19 +462,116 @@ export default function ToolPage() {
           </div>
         </div>
 
+        {/* Related Tools - Placed BEFORE FAQ section */}
         {relatedTools.length > 0 && (
           <div className="mt-8">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 font-heading">Related Tools</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {relatedTools.map(rt => (
-                <Link key={rt.id} to={`/tools/${rt.slug}`} onClick={handleReset} className="group flex items-center gap-3 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all duration-200">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${rt.gradient} flex items-center justify-center text-lg flex-shrink-0 group-hover:scale-110 transition-transform`}>{iconMap[rt.iconName] || '📄'}</div>
-                  <div><p className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{rt.name}</p><p className="text-xs text-slate-500 dark:text-slate-400">{rt.shortName}</p></div>
+              {relatedTools.map((rt) => (
+                <Link
+                  key={rt.id}
+                  to={`/tools/${rt.slug}`}
+                  onClick={handleReset}
+                  className="group flex items-center gap-3 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all duration-200"
+                >
+                  <div
+                    className={`w-10 h-10 rounded-xl bg-gradient-to-br ${rt.gradient} flex items-center justify-center text-lg flex-shrink-0 group-hover:scale-110 transition-transform`}
+                  >
+                    {iconMap[rt.iconName] || '📄'}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      {rt.name}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{rt.shortName}</p>
+                  </div>
                 </Link>
               ))}
             </div>
           </div>
         )}
+
+        {/* Interactive Slide-Down FAQ Accordion with Tool-Specific High-Volume Search FAQs */}
+        {(() => {
+          const toolFaqs = getFaqsForTool(tool.slug);
+          return (
+            <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6 font-heading">
+                Frequently Asked Questions about {tool.name}
+              </h2>
+              <div className="space-y-3">
+                {toolFaqs.map((faq, idx) => {
+                  const isOpen = openFaqIndex === idx;
+                  return (
+                    <div
+                      key={faq.question}
+                      className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-50/50 dark:bg-slate-800/30 transition-colors"
+                    >
+                      <button
+                        onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                        className="w-full flex items-center justify-between p-4 text-left font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors focus:outline-none"
+                      >
+                        <span className="text-sm font-bold font-heading">{faq.question}</span>
+                        <ChevronDown
+                          className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ${
+                            isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''
+                          }`}
+                        />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {isOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.25, ease: 'easeInOut' }}
+                          >
+                            <div className="px-4 pb-4 pt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/50 leading-relaxed">
+                              {faq.answer}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* JSON-LD Structured Data: Breadcrumbs & FAQ */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'BreadcrumbList',
+              itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://docverse.cloud/' },
+                { '@type': 'ListItem', position: 2, name: 'Tools', item: 'https://docverse.cloud/#tools' },
+                { '@type': 'ListItem', position: 3, name: tool.name, item: `https://docverse.cloud/tools/${tool.slug}` },
+              ],
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'FAQPage',
+              mainEntity: getFaqsForTool(tool.slug).map((faq) => ({
+                '@type': 'Question',
+                name: faq.question,
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: faq.answer,
+                },
+              })),
+            }),
+          }}
+        />
       </div>
     </div>
   );

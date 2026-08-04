@@ -1,4 +1,5 @@
 import { convertOfficeClientSide } from './office-parser';
+import { convertPdfToDocxClientSide } from './pdf-to-docx-parser';
 
 /**
  * Typed API Client for interacting with DocVerse Serverless Backend Endpoints (/api/*)
@@ -148,5 +149,68 @@ export async function convertOfficeToPDF(file: File): Promise<ConvertOfficeResul
 
   // Seamless client-side office document conversion engine
   return convertOfficeClientSide(file);
+}
+
+export interface ConvertPdfToWordResult {
+  docxBytes: Uint8Array;
+  docxFileName: string;
+}
+
+export async function convertPdfToWord(file: File): Promise<ConvertPdfToWordResult> {
+  try {
+    const fileData = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const res = (reader.result as string) || '';
+        resolve(res.split(',')[1] || '');
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const authHeaders = await getAuthHeader();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+    try {
+      const response = await fetch('/api/convert-pdf-to-word', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileData,
+        }),
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.docxData) {
+          const base64Str = (result.docxData || '').replace(/^data:application\/.*base64,/, '');
+          const binaryDocx = atob(base64Str);
+          const docxBytes = new Uint8Array(binaryDocx.length);
+          for (let i = 0; i < binaryDocx.length; i++) {
+            docxBytes[i] = binaryDocx.charCodeAt(i);
+          }
+
+          return {
+            docxBytes,
+            docxFileName: result.docxFileName || `${file.name.replace(/\.[^/.]+$/, '')}.docx`,
+          };
+        }
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch {
+    // Fast path to client-side conversion engine when server API is offline or during dev
+  }
+
+  return convertPdfToDocxClientSide(file);
 }
 
