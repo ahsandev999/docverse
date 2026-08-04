@@ -3,9 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Download, Loader2, CheckCircle, AlertCircle, RotateCcw, ArrowRight, Clock } from 'lucide-react';
 import { getToolBySlug, tools, iconMap } from '../../lib/tools';
-import { mergePDFs, rotatePDF, deletePages, extractPages, imagesToPDF, compressPDF, splitPDF, getPDFPageCount, convertDocumentToPDF, PDFProcessingError } from '../../lib/pdf-utils';
+import { mergePDFs, rotatePDF, deletePages, extractPages, imagesToPDF, compressPDF, splitPDF, getPDFPageCount, downloadBlob, PDFProcessingError } from '../../lib/pdf-utils';
 import { addRecentFile, generateId } from '../../lib/storage';
-import { logFileProcessing } from '../../lib/api-client';
+import { logFileProcessing, convertOfficeToPDF } from '../../lib/api-client';
 import { convertPdfToImages } from '../../lib/pdf-renderer';
 import OrganizePagesUI from './OrganizePagesUI';
 import DropZone from '../ui/DropZone';
@@ -24,6 +24,8 @@ export default function ToolPage() {
   const [progress, setProgress] = useState(0);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultName, setResultName] = useState<string | null>(null);
+  const [resultBytes, setResultBytes] = useState<Uint8Array | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [pageCount, setPageCount] = useState<number>(0);
   const [rotationAngle, setRotationAngle] = useState<number>(90);
@@ -31,12 +33,11 @@ export default function ToolPage() {
   const [imageQuality, setImageQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Cleanup blob URL on unmount or when resultUrl changes
-  const prevResultUrl = useRef<string | null>(null);
+  // Cleanup blob URL on unmount
   useEffect(() => {
-    if (prevResultUrl.current) URL.revokeObjectURL(prevResultUrl.current);
-    prevResultUrl.current = resultUrl;
-    return () => { if (prevResultUrl.current) URL.revokeObjectURL(prevResultUrl.current); };
+    return () => {
+      if (resultUrl) URL.revokeObjectURL(resultUrl);
+    };
   }, [resultUrl]);
 
   // Cleanup interval on unmount
@@ -106,8 +107,9 @@ export default function ToolPage() {
         case 'jpg-to-pdf': case 'png-to-pdf': { result = await imagesToPDF(files); outputName = 'images.pdf'; break; }
         case 'compress-pdf': { result = await compressPDF(files[0]); outputName = 'compressed.pdf'; break; }
         case 'word-to-pdf': case 'excel-to-pdf': case 'powerpoint-to-pdf': {
-          result = await convertDocumentToPDF(files[0], tool.slug.split('-')[0]);
-          outputName = `${files[0].name.split('.')[0]}.pdf`;
+          const officeResult = await convertOfficeToPDF(files[0]);
+          result = officeResult.pdfBytes;
+          outputName = officeResult.pdfFileName;
           break;
         }
         case 'pdf-to-word': {
@@ -122,6 +124,7 @@ export default function ToolPage() {
             onProgress: (curr, total) => setProgress(Math.round((curr / total) * 90)),
           });
           const url = URL.createObjectURL(imgResult.blob);
+          setResultBlob(imgResult.blob);
           setResultUrl(url);
           setResultName(imgResult.filename);
           addRecentFile({
@@ -155,7 +158,8 @@ export default function ToolPage() {
       setProgress(100);
 
       if (result) {
-        const blob = new Blob([result.buffer as ArrayBuffer], { type: 'application/pdf' });
+        setResultBytes(result);
+        const blob = new Blob([new Uint8Array(result)], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         setResultUrl(url); setResultName(outputName);
         addRecentFile({ id: generateId(), name: outputName, size: result.length, type: 'application/pdf', toolSlug: tool.slug, createdAt: new Date().toISOString(), status: 'completed' });
@@ -177,9 +181,28 @@ export default function ToolPage() {
   }, [tool, files, pageCount, pageInput, rotationAngle, imageQuality]);
 
   const handleDownload = () => {
+    if (resultBytes && resultName) {
+      downloadBlob(resultBytes, resultName);
+      return;
+    }
+    if (resultBlob && resultName) {
+      const url = URL.createObjectURL(resultBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = resultName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return;
+    }
     if (resultUrl && resultName) {
-      const a = document.createElement('a'); a.href = resultUrl; a.download = resultName;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      const a = document.createElement('a');
+      a.href = resultUrl;
+      a.download = resultName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
   };
 
