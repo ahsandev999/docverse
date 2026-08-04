@@ -38,9 +38,17 @@ export default class ErrorBoundary extends Component<Props, State> {
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-3 font-heading">
               Something went wrong
             </h1>
-            <p className="text-slate-500 dark:text-slate-400 mb-6">
+            <p className="text-slate-500 dark:text-slate-400 mb-4">
               An unexpected error occurred. Please try refreshing the page.
             </p>
+            {this.state.error && (
+              <div className="w-full mb-6 p-4 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/50 rounded-xl text-left">
+                <p className="text-xs font-bold text-red-800 dark:text-red-300 mb-1">Runtime Exception:</p>
+                <pre className="text-[11px] text-red-700 dark:text-red-300 font-mono whitespace-pre-wrap break-all overflow-auto max-h-48">
+                  {this.state.error.stack || this.state.error.message || String(this.state.error)}
+                </pre>
+              </div>
+            )}
             <button
               onClick={() => window.location.reload()}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all"

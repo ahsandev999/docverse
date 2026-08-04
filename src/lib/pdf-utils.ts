@@ -180,11 +180,27 @@ export async function convertDocumentToPDF(file: File, docType: string): Promise
   return pdfDoc.save();
 }
 
-export async function convertPDFToOffice(file: File, targetExt: string): Promise<Uint8Array> {
-  const arrayBuffer = await file.arrayBuffer();
-  await safeLoadPDF(arrayBuffer);
-  // Return converted binary payload
-  const content = `[DocVerse Converted ${targetExt.toUpperCase()} Document]\nSource PDF: ${file.name}\nSize: ${(file.size / 1024).toFixed(1)} KB`;
-  return new TextEncoder().encode(content);
+export interface OrganizedPageItem {
+  originalIndex: number;
+  rotation: number;
 }
+
+export async function organizePDF(file: File, pages: OrganizedPageItem[]): Promise<Uint8Array> {
+  const arrayBuffer = await file.arrayBuffer();
+  const sourcePdf = await safeLoadPDF(arrayBuffer);
+  if (pages.length === 0) throw new PDFProcessingError('No pages left in output PDF document.', 'empty');
+
+  const newPdf = await PDFDocument.create();
+  for (const item of pages) {
+    if (item.originalIndex >= 0 && item.originalIndex < sourcePdf.getPageCount()) {
+      const [copiedPage] = await newPdf.copyPages(sourcePdf, [item.originalIndex]);
+      if (item.rotation !== 0) {
+        copiedPage.setRotation(degrees((copiedPage.getRotation().angle + item.rotation) % 360));
+      }
+      newPdf.addPage(copiedPage);
+    }
+  }
+  return newPdf.save();
+}
+
 

@@ -3,9 +3,11 @@ import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Download, Loader2, CheckCircle, AlertCircle, RotateCcw, ArrowRight, Clock } from 'lucide-react';
 import { getToolBySlug, tools, iconMap } from '../../lib/tools';
-import { mergePDFs, rotatePDF, deletePages, extractPages, imagesToPDF, compressPDF, splitPDF, getPDFPageCount, convertDocumentToPDF, convertPDFToOffice, PDFProcessingError } from '../../lib/pdf-utils';
+import { mergePDFs, rotatePDF, deletePages, extractPages, imagesToPDF, compressPDF, splitPDF, getPDFPageCount, convertDocumentToPDF, PDFProcessingError } from '../../lib/pdf-utils';
 import { addRecentFile, generateId } from '../../lib/storage';
 import { logFileProcessing } from '../../lib/api-client';
+import { convertPdfToImages } from '../../lib/pdf-renderer';
+import OrganizePagesUI from './OrganizePagesUI';
 import DropZone from '../ui/DropZone';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 
@@ -26,6 +28,7 @@ export default function ToolPage() {
   const [pageCount, setPageCount] = useState<number>(0);
   const [rotationAngle, setRotationAngle] = useState<number>(90);
   const [pageInput, setPageInput] = useState<string>('');
+  const [imageQuality, setImageQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Cleanup blob URL on unmount or when resultUrl changes
@@ -42,10 +45,12 @@ export default function ToolPage() {
   }, []);
 
   const handleFilesSelected = useCallback(async (newFiles: File[]) => {
-    setFiles(prev => tool?.multiple ? [...prev, ...newFiles] : newFiles);
+    const valid = (newFiles || []).filter((f): f is File => Boolean(f && f.name));
+    if (valid.length === 0) return;
+    setFiles(prev => tool?.multiple ? [...(prev || []), ...valid] : valid);
     setState('idle'); setResultUrl(null); setResultName(null); setErrorMsg('');
-    if (newFiles[0]?.type === 'application/pdf') {
-      try { setPageCount(await getPDFPageCount(newFiles[0])); } catch { setPageCount(0); }
+    if (valid[0]?.type === 'application/pdf') {
+      try { setPageCount(await getPDFPageCount(valid[0])); } catch { setPageCount(0); }
     }
   }, [tool?.multiple]);
 
@@ -106,14 +111,33 @@ export default function ToolPage() {
           break;
         }
         case 'pdf-to-word': {
-          result = await convertPDFToOffice(files[0], 'docx');
-          outputName = `${files[0].name.split('.')[0]}.docx`;
-          break;
+          throw new PDFProcessingError('PDF to Word requires server-side processing engine.', 'unknown');
         }
         case 'pdf-to-jpg': case 'pdf-to-png': {
-          result = await convertPDFToOffice(files[0], tool.slug.split('-')[2] || 'jpg');
-          outputName = `${files[0].name.split('.')[0]}.${tool.slug.split('-')[2] || 'jpg'}`;
-          break;
+          const isJpeg = tool.slug === 'pdf-to-jpg';
+          const scale = imageQuality === 'low' ? 1.0 : imageQuality === 'high' ? 2.0 : 1.5;
+          const imgResult = await convertPdfToImages(files[0], {
+            format: isJpeg ? 'jpeg' : 'png',
+            qualityScale: scale,
+            onProgress: (curr, total) => setProgress(Math.round((curr / total) * 90)),
+          });
+          const url = URL.createObjectURL(imgResult.blob);
+          setResultUrl(url);
+          setResultName(imgResult.filename);
+          addRecentFile({
+            id: generateId(),
+            name: imgResult.filename,
+            size: imgResult.blob.size,
+            type: imgResult.mimeType,
+            toolSlug: tool.slug,
+            createdAt: new Date().toISOString(),
+            status: 'completed',
+          });
+          logFileProcessing(tool.slug, imgResult.filename, imgResult.blob.size);
+          if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); progressIntervalRef.current = null; }
+          setProgress(100);
+          setState('done');
+          return;
         }
         case 'organize-pages': {
           result = await rotatePDF(files[0], 0);
@@ -150,7 +174,7 @@ export default function ToolPage() {
       console.error('[DocVerse] Processing error:', err);
       setState('error');
     }
-  }, [tool, files, pageCount, pageInput, rotationAngle]);
+  }, [tool, files, pageCount, pageInput, rotationAngle, imageQuality]);
 
   const handleDownload = () => {
     if (resultUrl && resultName) {
@@ -284,16 +308,51 @@ export default function ToolPage() {
                         </p>
                       </div>
                     )}
-                    {tool.slug === 'compress-pdf' && (
-                      <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
-                        <p className="text-sm text-emerald-700 dark:text-emerald-300">Your PDF will be re-optimized using object stream compression. The file size reduction depends on the PDF structure.</p>
+                    {['pdf-to-jpg', 'pdf-to-png'].includes(tool.slug) && (
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Image Quality & Resolution</label>
+                        <div className="flex items-center gap-2" role="radiogroup" aria-label="Image resolution quality">
+                          {(['low', 'medium', 'high'] as const).map(q => (
+                            <button key={q} onClick={() => setImageQuality(q)} role="radio" aria-checked={imageQuality === q}
+                              className={`px-5 py-2.5 rounded-lg text-sm font-medium capitalize transition-all ${imageQuality === q ? 'bg-indigo-600 text-white shadow-md' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:border-indigo-300'}`}>
+                              {q} ({q === 'low' ? '150 DPI' : q === 'medium' ? '300 DPI' : '600 DPI'})
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
-                    <div className="flex justify-center">
-                      <button onClick={processFiles} className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:from-indigo-500 hover:to-violet-500 transition-all duration-200 hover:-translate-y-0.5">
-                        Process {files.length} File{files.length > 1 ? 's' : ''} <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {tool.slug === 'organize-pages' ? (
+                      <OrganizePagesUI
+                        file={files[0]}
+                        onSave={(resultBytes, name) => {
+                          const blob = new Blob([resultBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+                          const url = URL.createObjectURL(blob);
+                          setResultUrl(url);
+                          setResultName(name);
+                          addRecentFile({
+                            id: generateId(),
+                            name,
+                            size: resultBytes.length,
+                            type: 'application/pdf',
+                            toolSlug: tool.slug,
+                            createdAt: new Date().toISOString(),
+                            status: 'completed',
+                          });
+                          logFileProcessing(tool.slug, name, resultBytes.length);
+                          setState('done');
+                        }}
+                        onError={(msg) => {
+                          setErrorMsg(msg);
+                          setState('error');
+                        }}
+                      />
+                    ) : (
+                      <div className="flex justify-center">
+                        <button onClick={processFiles} className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:from-indigo-500 hover:to-violet-500 transition-all duration-200 hover:-translate-y-0.5">
+                          Process {files.length} File{files.length > 1 ? 's' : ''} <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </motion.div>

@@ -167,16 +167,16 @@ export default function DropZone({
 
       {/* Accepted file list */}
       <AnimatePresence>
-        {files.length > 0 && (
+        {files && files.length > 0 && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             className="space-y-2"
           >
-            {files.map((file, i) => (
+            {files.filter((f): f is File => Boolean(f && f.name)).map((file, i) => (
               <motion.div
-                key={file.name + i}
+                key={`${file.name}-${i}`}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
