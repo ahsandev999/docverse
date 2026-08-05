@@ -9,14 +9,14 @@ const footerLinks = {
   ],
   tools: tools.filter(t => t.popular).map(t => ({ label: t.name, to: `/tools/${t.slug}` })),
   company: [
-    { label: 'About', to: '#' },
-    { label: 'Blog', to: '#' },
-    { label: 'Contact', to: '#' },
+    { label: 'About', to: '/#features' },
+    { label: 'Blog', to: '/#tools' },
+    { label: 'Contact', to: '/#tools' },
   ],
   legal: [
-    { label: 'Privacy', to: '#' },
-    { label: 'Terms', to: '#' },
-    { label: 'Security', to: '#' },
+    { label: 'Privacy Policy', to: '/#features' },
+    { label: 'Terms of Service', to: '/#features' },
+    { label: 'Security', to: '/#features' },
   ],
 };
 
@@ -33,7 +33,7 @@ export default function Footer() {
               <span className="text-lg font-bold text-slate-900 dark:text-white font-heading">DocVerse</span>
             </Link>
             <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">
-              The modern document platform for professionals. Convert, optimize, and organize with ease.
+              The modern document platform for professionals. Convert, optimize, and organize your PDFs with ease.
             </p>
           </div>
           {Object.entries(footerLinks).map(([title, links]) => (
@@ -41,14 +41,18 @@ export default function Footer() {
               <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-4 capitalize">{title}</h4>
               <ul className="space-y-2.5">
                 {links.map(link => (
-                  <li key={link.label}><Link to={link.to} className="text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">{link.label}</Link></li>
+                  <li key={link.label}>
+                    <Link to={link.to} className="text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                      {link.label}
+                    </Link>
+                  </li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
         <div className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-slate-400 dark:text-slate-500">© 2025 DocVerse. All rights reserved.</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500">© 2026 DocVerse. All rights reserved.</p>
           <p className="text-sm text-slate-400 dark:text-slate-500">Made with ❤️ for the whole world.</p>
         </div>
       </div>
