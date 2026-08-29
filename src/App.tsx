@@ -13,6 +13,11 @@ const ToolPage = lazy(() => import('./components/tools/ToolPage'));
 const SignInPage = lazy(() => import('./pages/SignInPage'));
 const SignUpPage = lazy(() => import('./pages/SignUpPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
+const SecurityPage = lazy(() => import('./pages/SecurityPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 
 function PageLoader() {
   return (
@@ -37,10 +42,6 @@ function ToolPageWrapper() {
   );
 }
 
-// When VITE_CLERK_PUBLISHABLE_KEY is set, ClerkProvider wraps the app.
-// This is handled by wrapping the app in main.tsx or a separate entry point.
-// For now, the app works with or without Clerk keys.
-
 function App() {
   return (
     <ThemeProvider>
@@ -53,6 +54,11 @@ function App() {
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/tools/:slug" element={<ToolPageWrapper />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/security" element={<SecurityPage />} />
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/contact" element={<ContactPage />} />
                 <Route path="/sign-in/*" element={<SignInPage />} />
                 <Route path="/sign-up/*" element={<SignUpPage />} />
                 <Route path="*" element={<NotFoundPage />} />

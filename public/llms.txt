@@ -1,0 +1,26 @@
+# DocVerse
+
+> DocVerse is a free, fast, and privacy-first web application providing 15+ modern PDF and document processing tools directly in your browser.
+
+## Core Platform Pages
+- [DocVerse Homepage](https://docverse.cloud/)
+- [User Dashboard](https://docverse.cloud/dashboard)
+
+## PDF Conversion Tools
+- [PDF to Word Converter](https://docverse.cloud/tools/pdf-to-word)
+- [Word to PDF Converter](https://docverse.cloud/tools/word-to-pdf)
+- [PDF to JPG Converter](https://docverse.cloud/tools/pdf-to-jpg)
+- [JPG to PDF Converter](https://docverse.cloud/tools/jpg-to-pdf)
+- [PDF to PNG Converter](https://docverse.cloud/tools/pdf-to-png)
+- [PNG to PDF Converter](https://docverse.cloud/tools/png-to-pdf)
+- [Excel to PDF Converter](https://docverse.cloud/tools/excel-to-pdf)
+- [PowerPoint to PDF Converter](https://docverse.cloud/tools/powerpoint-to-pdf)
+
+## PDF Management & Utility Tools
+- [Merge PDF](https://docverse.cloud/tools/merge-pdf)
+- [Split PDF](https://docverse.cloud/tools/split-pdf)
+- [Compress PDF](https://docverse.cloud/tools/compress-pdf)
+- [Rotate PDF](https://docverse.cloud/tools/rotate-pdf)
+- [Organize PDF Pages](https://docverse.cloud/tools/organize-pages)
+- [Delete PDF Pages](https://docverse.cloud/tools/delete-pages)
+- [Extract PDF Pages](https://docverse.cloud/tools/extract-pages)
