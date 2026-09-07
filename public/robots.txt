@@ -1,3 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /sign-in
+Disallow: /sign-up
+
 Sitemap: https://docverse.cloud/sitemap.xml
